@@ -13,7 +13,7 @@ import numpy as np
 
 from config import *
 
-app = Flask(__name__)
+app = Flask(__name__, instance_path=DB_PATH)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///assets.db'
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = True
 db.init_app(app)
@@ -93,10 +93,10 @@ def scan():
     print("开始扫描")
     scan_start_time = time.time()
     start_time = time.time()
-    if os.path.isfile("assets.pickle"):
+    if os.path.isfile(PICKLE_FILE):
         print("读取上次的目录缓存")
         is_continue_scan = True
-        with open("assets.pickle", "rb") as f:
+        with open(PICKLE_FILE, "rb") as f:
             assets = pickle.load(f)
         for asset in assets.copy():
             if asset.startswith(SKIP_PATH):
@@ -104,7 +104,7 @@ def scan():
     else:
         is_continue_scan = False
         assets = scan_dir(ASSETS_PATH, SKIP_PATH, IMAGE_EXTENSIONS + VIDEO_EXTENSIONS)
-        with open("assets.pickle", "wb") as f:
+        with open(PICKLE_FILE, "wb") as f:
             pickle.dump(assets, f)
     scanning_files = len(assets)
     with app.app_context():
@@ -123,7 +123,7 @@ def scan():
         for asset in assets.copy():
             scanned_files += 1
             if scanned_files % 100 == 0:  # 每扫描100次重新save一下
-                with open("assets.pickle", "wb") as f:
+                with open(PICKLE_FILE, "wb") as f:
                     pickle.dump(assets, f)
             # 如果数据库里有这个文件，并且修改时间一致，则跳过，否则进行预处理并入库
             if asset.lower().endswith(IMAGE_EXTENSIONS):  # 图片
@@ -166,7 +166,7 @@ def scan():
             db.session.commit()
             assets.remove(asset)
     scanning_files = 0
-    os.remove("assets.pickle")
+    os.remove(PICKLE_FILE)
     print("扫描完成，用时%d秒" % int(time.time() - start_time))
     clean_cache()  # 清空搜索缓存
     is_scanning = False
@@ -339,15 +339,15 @@ def api_match():
         _hash = get_string_hash(
             "以文搜图%d,%d\npositive: %r\nnegative: %r" % (positive_threshold, negative_threshold, data['positive'], data['negative']))
     elif search_type == 1:  # 以图搜图
-        _hash = get_string_hash("以图搜图%d,%s" % (image_threshold, get_file_hash("upload.tmp")))
+        _hash = get_string_hash("以图搜图%d,%s" % (image_threshold, get_file_hash(TEMP_FILE)))
     elif search_type == 2:  # 以文搜视频
         _hash = get_string_hash(
             "以文搜视频%d,%d\npositive: %r\nnegative: %r" % (positive_threshold, negative_threshold, data['positive'], data['negative']))
     elif search_type == 3:  # 以图搜视频
-        _hash = get_string_hash("以图搜视频%d,%s" % (image_threshold, get_file_hash("upload.tmp")))
+        _hash = get_string_hash("以图搜视频%d,%s" % (image_threshold, get_file_hash(TEMP_FILE)))
     elif search_type == 4:  # 图文比对
         _hash1 = get_string_hash("text: %r" % data['text'])
-        _hash2 = get_file_hash("upload.tmp")
+        _hash2 = get_file_hash(TEMP_FILE)
         _hash = get_string_hash("图文比对\nhash1: %r\nhash2: %r" % (_hash1, _hash2))
     else:
         print("search_type不正确：", search_type)
@@ -379,14 +379,14 @@ def api_match():
         sorted_list = search_image(positive_prompt=data['positive'], negative_prompt=data['negative'],
                                    positive_threshold=positive_threshold, negative_threshold=positive_threshold)[:MAX_RESULT_NUM]
     elif search_type == 1:
-        sorted_list = search_image(img_path="upload.tmp", image_threshold=image_threshold)[:MAX_RESULT_NUM]
+        sorted_list = search_image(img_path=TEMP_FILE, image_threshold=image_threshold)[:MAX_RESULT_NUM]
     elif search_type == 2:
         sorted_list = search_video(positive_prompt=data['positive'], negative_prompt=data['negative'],
                                    positive_threshold=positive_threshold, negative_threshold=positive_threshold)[:MAX_RESULT_NUM]
     elif search_type == 3:
-        sorted_list = search_video(img_path="upload.tmp", image_threshold=image_threshold)[:MAX_RESULT_NUM]
+        sorted_list = search_video(img_path=TEMP_FILE, image_threshold=image_threshold)[:MAX_RESULT_NUM]
     elif search_type == 4:
-        return jsonify({"score": "%.2f" % (match_text_and_image(process_text(data['text']), process_image("upload.tmp")) * 100)})
+        return jsonify({"score": "%.2f" % (match_text_and_image(process_text(data['text']), process_image(TEMP_FILE)) * 100)})
     # 写入缓存
     if ENABLE_CACHE:
         with app.app_context():
@@ -432,7 +432,7 @@ def api_get_video(video_path):
 def api_upload():
     print(request.files)
     f = request.files['file']
-    f.save("upload.tmp")
+    f.save(TEMP_FILE)
     return 'file uploaded successfully'
 
 

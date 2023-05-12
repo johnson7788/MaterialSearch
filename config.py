@@ -1,7 +1,7 @@
 # *****扫描配置*****
 AUTO_SCAN = False  # 是否在启动时进行一次扫描
 ASSETS_PATH = (
-    "/Users/admin/Downloads/",
+    "/Users/admin/tmp/labelimages",
 )  # 素材所在根目录，绝对路径
 DB_PATH = "/Users/admin/Downloads/DB"  #
 PICKLE_FILE = "/Users/admin/Downloads/DB/assets.pickle"  # pickle文件存放目录
